@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f1fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14101f" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Exact hit-probability heatmap for Jewel Gate. Works offline.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jewel Gate">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Jewel Gate Heatmap</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>Jewel Gate heatmap</h1>
+  <span id="net" class="pill" hidden></span>
+  <button id="install" class="btn small" hidden>Install</button>
+</header>
+
+<main>
+  <nav id="levels" aria-label="Level"></nav>
+
+  <section class="card" aria-labelledby="gems-h">
+    <div class="card-head">
+      <h2 id="gems-h">Gems</h2>
+      <span id="found-count" class="count"></span>
+    </div>
+    <ul id="gems"></ul>
+    <p class="note">Sizes are rows x cols; gems can be rotated. Tap + when a gem is found.</p>
+  </section>
+
+  <section class="card" aria-labelledby="board-h">
+    <div class="card-head">
+      <h2 id="board-h">Board</h2>
+      <span id="calc" class="calc" hidden>Calculating…</span>
+      <div class="actions">
+        <button id="undo" class="btn small">Undo</button>
+        <button id="reset" class="btn small">Reset</button>
+      </div>
+    </div>
+    <div id="grid" role="grid" aria-label="Heatmap. Tap or drag to mark squares as dug."></div>
+    <p id="status" class="status" aria-live="polite"></p>
+    <p class="legend">Tap or drag over squares you dug (empty digs and every square of a found gem turn black). Orange outline: best square(s); dashed: within 0.5 points. Darker blue = more likely.</p>
+  </section>
+
+  <section class="card" aria-labelledby="best-h">
+    <h2 id="best-h">Best squares to dig</h2>
+    <table id="best"></table>
+    <p id="best-note" class="note"></p>
+    <details><summary>Details</summary><p id="details" class="note"></p></details>
+  </section>
+</main>
+
+<div id="ios" class="banner" hidden>To install: tap Share, then Add to Home Screen. After that it runs offline.</div>
+<div id="update" class="banner" hidden><span>A new version is ready.</span> <button id="reload" class="btn small">Reload</button></div>
+
+<noscript>This app needs JavaScript.</noscript>
+<script src="js/levels.js"></script>
+<script src="js/solver.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
