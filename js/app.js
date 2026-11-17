@@ -191,16 +191,32 @@ function setCell(i, on) {
   if (el) { el.className = 'cell ' + (on ? 'dug' : 'unk'); el.style.cssText = ''; el.textContent = ''; el.classList.remove('best', 'near'); }
   return true;
 }
+/* System gestures (swipe up for the iOS app switcher / home, edge swipes) fire pointerdown on a tile and then
+ * pointercancel. A cancelled touch must never change the board, so it is rolled back, and touches that begin
+ * in the screen-edge gesture zone are ignored outright. */
+const EDGE = 28;   // px from the bottom/left/right screen edge where system gestures begin
+const inEdge = (e) => e.pointerType !== 'mouse' &&
+  (e.clientY > innerHeight - EDGE || e.clientX < EDGE || e.clientX > innerWidth - EDGE);
+function cancelPaint() {
+  if (!paint) return;
+  const p = paint; paint = null;
+  if (!p.changed) return;
+  const b = board(); b.dug = p.start.dug; b.found = p.start.found;
+  render();   // redraw the grid from the restored state
+}
 grid.addEventListener('pointerdown', (e) => {
   const c = e.target.closest('[data-i]'); if (!c) return;
   e.preventDefault();
+  if (paint) { cancelPaint(); return; }     // a second finger means this is not a single tap or drag
+  if (!e.isPrimary || inEdge(e)) return;
   const b = board(), i = +c.dataset.i;
-  paint = { on: !b.dug.includes(i), start: snap(b), changed: false, last: i };
+  paint = { on: !b.dug.includes(i), start: snap(b), changed: false, last: i, id: e.pointerId };
   paint.changed = setCell(i, paint.on);
   try { grid.setPointerCapture(e.pointerId); } catch (err) {}
 });
 grid.addEventListener('pointermove', (e) => {
-  if (!paint) return;
+  if (!paint || e.pointerId !== paint.id) return;
+  if (inEdge(e)) { cancelPaint(); return; }   // finger dragged into the gesture zone
   const el = document.elementFromPoint(e.clientX, e.clientY), c = el && el.closest && el.closest('[data-i]');
   if (!c || !grid.contains(c)) return;
   const i = +c.dataset.i;
@@ -211,8 +227,12 @@ function endPaint() {
   const p = paint; paint = null;
   if (p.changed) { const b = board(); b.dug.sort((a, c) => a - c); pushHist(b, p.start); commit(); }
 }
-grid.addEventListener('pointerup', endPaint);
-grid.addEventListener('pointercancel', endPaint);
+grid.addEventListener('pointerup', (e) => { if (paint && e.pointerId === paint.id) endPaint(); });
+grid.addEventListener('pointercancel', cancelPaint);
+// the app switcher / backgrounding can swallow pointerup and pointercancel entirely
+document.addEventListener('visibilitychange', () => { if (document.hidden) cancelPaint(); });
+addEventListener('pagehide', cancelPaint);
+addEventListener('blur', cancelPaint);
 grid.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const c = e.target.closest('[data-i]'); if (!c) return;
