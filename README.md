@@ -13,6 +13,8 @@ It is a port of the solver in [nadavcoh/jewel-gate-heatmap](https://github.com/n
 
 State is saved per level in `localStorage`. **Undo** steps back (also after **Reset**).
 
+**Accidental digs:** a tile is only dug if the touch completes normally. If iOS interrupts it (swipe up for the app switcher or home, an edge swipe, a second finger, or the app being backgrounded mid-touch), the dig is rolled back. Touches that start within 28px of the bottom, left or right screen edge are ignored (`EDGE` in `js/app.js`).
+
 ## Install / offline
 
 Open the deployed page once, then *Install app* (Chrome/Edge/Android) or *Share → Add to Home Screen* (iOS). A service worker precaches everything, so it runs fully offline afterwards. When a new version is deployed, a "new version is ready" banner appears.
@@ -34,7 +36,7 @@ node tests/selftest.js          # solver vs. the Python original's stored result
 |---|---|
 | `js/solver.js` | exact solver (bitmask enumeration, runs in a Web Worker; level 5 blank board ~0.4 s on a laptop) |
 | `js/levels.js` | level table: board size, gems with sizes and found colours |
-| `js/app.js` | UI, localStorage, painting, install/offline handling |
+| `js/app.js` | UI, localStorage, painting (with rollback on cancelled touches), install/offline handling |
 | `sw.js`, `manifest.webmanifest` | offline cache and installability |
 
 To add a level, add an entry to `js/levels.js` (there are no standard gem sizes; every gem needs its own `size: [rows, cols]`). Boards up to 64 squares are supported.
