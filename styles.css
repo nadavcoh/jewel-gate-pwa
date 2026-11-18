@@ -64,10 +64,19 @@ main{max-width:560px;margin:0 auto;padding:0 12px;display:flex;flex-direction:co
 .n7 .cell{font-size:13px}.n8 .cell{font-size:12px}
 .cell.unk{background:var(--unk);color:var(--muted)}
 .cell.dug{background:var(--dug);border:1px solid var(--dug-b);color:transparent}
+.cell.dug.marked{border-color:transparent;font-size:13px}
 .cell.best{outline:3px solid var(--orange);outline-offset:-3px}
 .cell.near{outline:2px dashed var(--orange);outline-offset:-2px}
 .cell:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
 #grid.stale .cell:not(.dug){opacity:.45}
+.modebar{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;margin-bottom:8px;background:var(--unk);border-radius:12px}
+.seg{font:inherit;font-size:14px;min-height:36px;border:0;border-radius:9px;background:transparent;color:var(--text);cursor:pointer}
+.seg[aria-pressed=true]{background:var(--accent);color:#fff;font-weight:600}
+.brushes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.brush{font:inherit;font-size:13px;min-height:36px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:10px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.brush i{display:block;width:12px;height:12px;border-radius:3px}
+.brush[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;font-weight:600}
 .status{margin:10px 0 0;font-size:14px}
 .status.warn{color:var(--warn)}
 .status.ok{color:var(--ok)}

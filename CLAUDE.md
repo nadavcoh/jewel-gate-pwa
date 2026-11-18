@@ -42,6 +42,7 @@ When adding a new top-level file or asset it must be added in **both** places or
 - Never run the solver on the main thread unless the worker is unavailable (`requestSolve` already falls back).
 - Painting must stay cancel-safe: a dig is committed only on a completed `pointerup`. `pointercancel`, `visibilitychange` (hidden), `pagehide`, `blur`, a second finger, and touches in the screen-edge zone (`EDGE`) roll back or are ignored, so the iOS app switcher and other system gestures never dig a tile. Keep this behaviour when changing `js/app.js` grid input, and keep `#grid` on `touch-action:none`.
 - Found-gem colours for hex and flat are placeholders; octagon, diamond and tall are measured. Hidden gems are magenta.
+- Gem marks (`board().marks`, square index to gem class, set in Mark gem mode) are display-only bookkeeping: the solver ignores them because found gems are already inside the dug squares. They must stay a subset of `dug` (un-digging clears the mark; marking digs) and are part of every undo snapshot.
 - Stored state is untrusted: `board()` sanitises whatever comes out of `localStorage`. Preserve that when changing the state shape, and bump the `KEY` version if the shape changes incompatibly.
 
 ## Working style

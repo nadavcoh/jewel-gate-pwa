@@ -43,9 +43,15 @@
         <button id="reset" class="btn small">Reset</button>
       </div>
     </div>
+    <div id="modebar" class="modebar" role="group" aria-label="Tap mode">
+      <button id="mode-dig" class="seg" aria-pressed="true">Dig</button>
+      <button id="mode-mark" class="seg" aria-pressed="false">Mark gem</button>
+    </div>
+    <div id="brushes" class="brushes" role="group" aria-label="Gem to mark" hidden></div>
     <div id="grid" role="grid" aria-label="Heatmap. Tap or drag to mark squares as dug."></div>
     <p id="status" class="status" aria-live="polite"></p>
     <p class="legend">Tap or drag over squares you dug (empty digs and every square of a found gem turn black). Orange outline: best square(s); dashed: within 0.5 points. Darker blue = more likely.</p>
+    <p class="legend">Optional: <b>Mark gem</b> lets you pick a gem, then tap or drag over its squares to colour them (they also count as dug). It only records where found gems are; it does not change the heatmap.</p>
   </section>
 
   <section class="card" aria-labelledby="best-h">

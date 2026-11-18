@@ -8,6 +8,7 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const pct = (p) => (100 * p).toFixed(2) + '%';
 
 /* ---------- state ---------- */
+const ui = { mode: 'dig', brush: null };   // not persisted: tap mode and the gem being marked
 let state = loadState();
 function loadState() {
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object' && s.boards) return s; } catch (e) {}
@@ -17,16 +18,21 @@ function saveState() { try { localStorage.setItem(KEY, JSON.stringify(state)); }
 const lvl = () => LEVELS.find((l) => l.level === state.level) || LEVELS[0];
 function board() {
   const lv = lvl(), N = lv.rows * lv.cols;
-  const b = state.boards[lv.level] || (state.boards[lv.level] = { dug: [], found: {}, hist: [] });
+  const b = state.boards[lv.level] || (state.boards[lv.level] = { dug: [], found: {}, marks: {}, hist: [] });
   // sanitize whatever came out of storage
   b.dug = [...new Set((Array.isArray(b.dug) ? b.dug : []).filter((i) => Number.isInteger(i) && i >= 0 && i < N))].sort((a, c) => a - c);
   const f = {};
   lv.gems.forEach((g) => { const v = Math.min(g.count, Math.max(0, parseInt((b.found || {})[g.class], 10) || 0)); if (v) f[g.class] = v; });
   b.found = f;
+  // marks: { cellIndex: gemClass } for squares recorded as part of a found gem; always a subset of the dug squares
+  const dugSet = new Set(b.dug), m = {}, raw = b.marks && typeof b.marks === 'object' ? b.marks : {};
+  Object.keys(raw).forEach((k) => { const i = +k; if (Number.isInteger(i) && dugSet.has(i) && lv.gems.some((g) => g.class === raw[k])) m[i] = raw[k]; });
+  b.marks = m;
   if (!Array.isArray(b.hist)) b.hist = [];
   return b;
 }
-const snap = (b) => ({ dug: b.dug.slice(), found: Object.assign({}, b.found) });
+const snap = (b) => ({ dug: b.dug.slice(), found: Object.assign({}, b.found), marks: Object.assign({}, b.marks) });
+const markCounts = (b) => { const m = {}; Object.keys(b.marks).forEach((k) => { m[b.marks[k]] = (m[b.marks[k]] || 0) + 1; }); return m; };
 function pushHist(b, s) { b.hist.push(s); if (b.hist.length > 60) b.hist.shift(); }
 function commit() { saveState(); render(); requestSolve(); }
 
@@ -80,13 +86,16 @@ function renderLevels() {
 function renderGems(lv, b) {
   const ul = $('#gems'); ul.innerHTML = '';
   let total = 0, found = 0;
+  const mc = markCounts(b);
   lv.gems.forEach((g) => {
     const f = b.found[g.class] || 0; total += g.count; found += f;
+    const n = mc[g.class] || 0, area = g.size[0] * g.size[1];
+    const marked = n ? ` · ${n}${f ? ' of ' + f * area : ''} squares marked` : '';
     const li = document.createElement('li');
     const icons = document.createElement('div'); icons.className = 'icons';
     for (let j = 0; j < g.count; j++) icons.appendChild(mini(g, j < f));
     const t = document.createElement('div'); t.className = 'gem-t';
-    t.innerHTML = `<b>${cap(g.class)} ${g.size[0]}x${g.size[1]}</b><small>${f} of ${g.count} found</small>`;
+    t.innerHTML = `<b>${cap(g.class)} ${g.size[0]}x${g.size[1]}</b><small>${f} of ${g.count} found${marked}</small>`;
     const step = document.createElement('div'); step.className = 'step';
     const minus = Object.assign(document.createElement('button'), { className: 'btn', textContent: '−', disabled: f === 0 });
     const plus = Object.assign(document.createElement('button'), { className: 'btn', textContent: '+', disabled: f === g.count });
@@ -130,7 +139,13 @@ function renderGrid(lv, b) {
     h += `<div class="lab">r${r + 1}</div>`;
     for (let c = 0; c < lv.cols; c++) {
       const i = r * lv.cols + c, name = `r${r + 1}c${c + 1}`;
-      if (dug.has(i)) { h += `<div class="cell dug" role="gridcell" tabindex="0" data-i="${i}" aria-label="${name} dug"></div>`; continue; }
+      if (dug.has(i)) {
+        const mg = b.marks[i] && lv.gems.find((x) => x.class === b.marks[i]);
+        h += mg
+          ? `<div class="cell dug marked" role="gridcell" tabindex="0" data-i="${i}" aria-label="${name} dug, ${mg.class}" style="background:${mg.color};color:#17131f">${mg.class[0].toUpperCase()}</div>`
+          : `<div class="cell dug" role="gridcell" tabindex="0" data-i="${i}" aria-label="${name} dug"></div>`;
+        continue;
+      }
       const p = usable ? res.prob[i] : null;
       if (p === null || p === undefined) { h += `<div class="cell unk" role="gridcell" tabindex="0" data-i="${i}" aria-label="${name}"></div>`; continue; }
       const [bg, fg] = heat(p, lo, hi, flat);
@@ -145,8 +160,10 @@ function renderResult(lv, b, counts) {
   const empty = b.dug.length - foundCells, st = $('#status');
   const label = (i) => `r${Math.floor(i / lv.cols) + 1}c${i % lv.cols + 1}`;
   let msg = `Black squares ${b.dug.length} − found-gem squares ${foundCells} = ${empty} empty digs`, cls = 'status';
+  const mc = markCounts(b), over = lv.gems.filter((g) => (mc[g.class] || 0) > (b.found[g.class] || 0) * g.size[0] * g.size[1]);
   if (empty < 0) { msg += '. Negative: mark every revealed square of each found gem, or lower the found count.'; cls += ' warn'; }
-  else if (counts.found === counts.total) { msg += '. All gems found.'; cls += ' ok'; }
+  else if (counts.found === counts.total && !over.length) { msg += '. All gems found.'; cls += ' ok'; }
+  if (over.length) { msg += `. More ${over.map((g) => g.class).join(', ')} squares are marked than the found gems cover: press + for each found gem, or clear the extra marks.`; if (!/warn/.test(cls)) cls += ' warn'; }
   st.className = cls; st.textContent = msg;
 
   const tbl = $('#best'), note = $('#best-note'), det = $('#details');
@@ -173,6 +190,7 @@ function render() {
   const lv = lvl(), b = board();
   renderLevels();
   const counts = renderGems(lv, b);
+  renderMode(lv);
   renderGrid(lv, b);
   renderResult(lv, b, counts);
   $('#calc').hidden = !pending;
@@ -180,17 +198,60 @@ function render() {
   $('#reset').disabled = b.dug.length === 0 && !Object.keys(b.found).length;
 }
 
+/* ---------- tap mode: dig squares, or mark which squares belong to a found gem ---------- */
+function renderMode(lv) {
+  const mark = ui.mode === 'mark', bar = $('#brushes');
+  if (!lv.gems.some((g) => g.class === ui.brush)) ui.brush = lv.gems[0].class;
+  $('#mode-dig').setAttribute('aria-pressed', !mark);
+  $('#mode-mark').setAttribute('aria-pressed', mark);
+  bar.hidden = !mark; bar.innerHTML = '';
+  if (mark) lv.gems.forEach((g) => {
+    const btn = document.createElement('button');
+    btn.className = 'brush'; btn.setAttribute('aria-pressed', g.class === ui.brush);
+    btn.innerHTML = `<i style="background:${g.color}"></i>${cap(g.class)} ${g.size[0]}x${g.size[1]}`;
+    btn.onclick = () => { ui.brush = g.class; render(); };
+    bar.appendChild(btn);
+  });
+  $('#grid').setAttribute('aria-label', mark
+    ? `Heatmap. Tap or drag to mark ${ui.brush} squares of a found gem.`
+    : 'Heatmap. Tap or drag to mark squares as dug.');
+}
+$('#mode-dig').onclick = () => { ui.mode = 'dig'; render(); };
+$('#mode-mark').onclick = () => { ui.mode = 'mark'; render(); };
+
 /* ---------- painting squares (tap or drag) ---------- */
 const grid = $('#grid');
 let paint = null;
 function setCell(i, on) {
   const b = board(), has = b.dug.includes(i);
   if (on === has) return false;
-  if (on) b.dug.push(i); else b.dug.splice(b.dug.indexOf(i), 1);
+  if (on) b.dug.push(i); else { b.dug.splice(b.dug.indexOf(i), 1); delete b.marks[i]; }
   const el = grid.querySelector(`[data-i="${i}"]`);
   if (el) { el.className = 'cell ' + (on ? 'dug' : 'unk'); el.style.cssText = ''; el.textContent = ''; el.classList.remove('best', 'near'); }
   return true;
 }
+/* Mark mode: paint (or clear) the brush gem on a square. Marking also digs the square, since a found gem is fully revealed. */
+function setMark(i, on, cls) {
+  const b = board(), lv = lvl(), g = lv.gems.find((x) => x.class === cls);
+  if (!g) return false;
+  if (on) {
+    if (b.marks[i] === cls && b.dug.includes(i)) return false;
+    if (!b.dug.includes(i)) b.dug.push(i);
+    b.marks[i] = cls;
+  } else {
+    if (b.marks[i] !== cls) return false;
+    delete b.marks[i];
+  }
+  const el = grid.querySelector(`[data-i="${i}"]`);
+  if (el) {
+    el.classList.remove('best', 'near', 'unk');
+    if (on) { el.className = 'cell dug marked'; el.style.cssText = `background:${g.color};color:#17131f`; el.textContent = cls[0].toUpperCase(); }
+    else { el.className = 'cell dug'; el.style.cssText = ''; el.textContent = ''; }
+  }
+  return true;
+}
+const applyPaint = (i) => paint.mark ? setMark(i, paint.on, paint.mark) : setCell(i, paint.on);
+
 /* System gestures (swipe up for the iOS app switcher / home, edge swipes) fire pointerdown on a tile and then
  * pointercancel. A cancelled touch must never change the board, so it is rolled back, and touches that begin
  * in the screen-edge gesture zone are ignored outright. */
@@ -201,7 +262,7 @@ function cancelPaint() {
   if (!paint) return;
   const p = paint; paint = null;
   if (!p.changed) return;
-  const b = board(); b.dug = p.start.dug; b.found = p.start.found;
+  const b = board(); b.dug = p.start.dug; b.found = p.start.found; b.marks = p.start.marks || {};
   render();   // redraw the grid from the restored state
 }
 grid.addEventListener('pointerdown', (e) => {
@@ -210,8 +271,9 @@ grid.addEventListener('pointerdown', (e) => {
   if (paint) { cancelPaint(); return; }     // a second finger means this is not a single tap or drag
   if (!e.isPrimary || inEdge(e)) return;
   const b = board(), i = +c.dataset.i;
-  paint = { on: !b.dug.includes(i), start: snap(b), changed: false, last: i, id: e.pointerId };
-  paint.changed = setCell(i, paint.on);
+  const mark = ui.mode === 'mark' ? ui.brush : null;
+  paint = { mark, on: mark ? b.marks[i] !== mark : !b.dug.includes(i), start: snap(b), changed: false, last: i, id: e.pointerId };
+  paint.changed = applyPaint(i);
   try { grid.setPointerCapture(e.pointerId); } catch (err) {}
 });
 grid.addEventListener('pointermove', (e) => {
@@ -220,7 +282,7 @@ grid.addEventListener('pointermove', (e) => {
   const el = document.elementFromPoint(e.clientX, e.clientY), c = el && el.closest && el.closest('[data-i]');
   if (!c || !grid.contains(c)) return;
   const i = +c.dataset.i;
-  if (i !== paint.last) { paint.last = i; if (setCell(i, paint.on)) paint.changed = true; }
+  if (i !== paint.last) { paint.last = i; if (applyPaint(i)) paint.changed = true; }
 });
 function endPaint() {
   if (!paint) return;
@@ -238,17 +300,18 @@ grid.addEventListener('keydown', (e) => {
   const c = e.target.closest('[data-i]'); if (!c) return;
   e.preventDefault();
   const b = board(), i = +c.dataset.i, s = snap(b);
-  setCell(i, !b.dug.includes(i)); b.dug.sort((a, d) => a - d); pushHist(b, s); commit();
+  if (ui.mode === 'mark') setMark(i, b.marks[i] !== ui.brush, ui.brush); else setCell(i, !b.dug.includes(i));
+  b.dug.sort((a, d) => a - d); pushHist(b, s); commit();
   const again = grid.querySelector(`[data-i="${i}"]`); if (again) again.focus();
 });
 
 /* ---------- undo / reset ---------- */
 $('#undo').onclick = () => {
   const b = board(), s = b.hist.pop(); if (!s) return;
-  b.dug = s.dug; b.found = s.found; commit();
+  b.dug = s.dug; b.found = s.found; b.marks = s.marks || {}; commit();
 };
 $('#reset').onclick = () => {
-  const b = board(); pushHist(b, snap(b)); b.dug = []; b.found = {}; commit();   // undo restores it
+  const b = board(); pushHist(b, snap(b)); b.dug = []; b.found = {}; b.marks = {}; commit();   // undo restores it
 };
 
 /* ---------- install, offline, updates ---------- */

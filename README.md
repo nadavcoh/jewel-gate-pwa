@@ -11,13 +11,15 @@ It is a port of the solver in [nadavcoh/jewel-gate-heatmap](https://github.com/n
 3. When a gem is found, press **+** on that gem. Sizes are `rows x cols`; gems can be rotated and may touch.
 4. Read the new heatmap. Orange outline = best square(s), dashed = within 0.5 points. The status line checks `black squares - found-gem squares = empty digs` (must not be negative).
 
+5. Optional: switch the Board to **Mark gem**, pick a gem (shown with its `rows x cols` size) and tap or drag over the squares of a found gem to colour them. Marked squares are also dug. Tap a marked square again with the same gem to clear it. This only records where found gems are: the heatmap is unchanged. Press **+** separately to count the gem; a warning shows if more squares are marked for a gem class than its found gems cover.
+
 State is saved per level in `localStorage`. **Undo** steps back (also after **Reset**).
 
 **Accidental digs:** a tile is only dug if the touch completes normally. If iOS interrupts it (swipe up for the app switcher or home, an edge swipe, a second finger, or the app being backgrounded mid-touch), the dig is rolled back. Touches that start within 28px of the bottom, left or right screen edge are ignored (`EDGE` in `js/app.js`).
 
 ## Saved data
 
-Everything is stored in `localStorage` under the key `jewelgate.v1`: the selected level and, per level, the dug squares, the found-gem counts and up to 60 undo steps. Clearing the site's data resets the app.
+Everything is stored in `localStorage` under the key `jewelgate.v1`: the selected level and, per level, the dug squares, the found-gem counts, the optional gem marks (`marks`: square index to gem class) and up to 60 undo steps. Clearing the site's data resets the app.
 
 Open the deployed page once, then *Install app* (Chrome/Edge/Android) or *Share → Add to Home Screen* (iOS). A service worker precaches everything, so it runs fully offline afterwards. When a new version is deployed, a "new version is ready" banner appears.
 
