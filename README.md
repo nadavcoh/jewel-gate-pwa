@@ -15,13 +15,15 @@ State is saved per level in `localStorage`. **Undo** steps back (also after **Re
 
 **Accidental digs:** a tile is only dug if the touch completes normally. If iOS interrupts it (swipe up for the app switcher or home, an edge swipe, a second finger, or the app being backgrounded mid-touch), the dig is rolled back. Touches that start within 28px of the bottom, left or right screen edge are ignored (`EDGE` in `js/app.js`).
 
-## Install / offline
+## Saved data
+
+Everything is stored in `localStorage` under the key `jewelgate.v1`: the selected level and, per level, the dug squares, the found-gem counts and up to 60 undo steps. Clearing the site's data resets the app.
 
 Open the deployed page once, then *Install app* (Chrome/Edge/Android) or *Share → Add to Home Screen* (iOS). A service worker precaches everything, so it runs fully offline afterwards. When a new version is deployed, a "new version is ready" banner appears.
 
 ## Deploy to GitHub Pages
 
-Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**. Every push to `main` runs `.github/workflows/deploy.yml`: it runs the solver self-test, assembles the site, stamps the commit SHA into the service-worker cache name and deploys. The site lives at `https://<user>.github.io/<repo>/` (all paths are relative, so any repo name works).
+Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**. Every push to `main` runs `.github/workflows/deploy.yml`: it runs the solver self-test, assembles the site, stamps the commit SHA into the service-worker cache name and deploys. The site lives at `https://nadavcoh.github.io/jewel-gate-pwa/` (all paths are relative, so a renamed or forked repo works too). If the first run fails because Pages was not enabled yet, enable it and re-run the workflow from the **Actions** tab.
 
 ## Develop
 
@@ -30,7 +32,7 @@ python3 -m http.server 8000     # then open http://localhost:8000
 node tests/selftest.js          # solver vs. the Python original's stored results
 ```
 
-`tests/blank.json` is `levels/levels.json` from the original repo (blank-board heatmaps for levels 1-5). The test also checks boards from the original's examples and session log.
+`tests/blank.json` is `levels/levels.json` from the original repo (blank-board heatmaps for levels 1-5). The test also checks boards from the original's examples and session log. In local development `sw.js` keeps the literal cache name `__BUILD__` (CI stamps the real one), so after editing files hard-reload or unregister the service worker to bypass the offline cache.
 
 | File | What |
 |---|---|
