@@ -1,52 +1,45 @@
 # CLAUDE.md
 
-Guidance for Claude when working in this repo. See `README.md` for user-facing docs.
+Guidance for working on this repo. See `README.md` for what the app does and how to use it.
 
 ## What this is
 
-Offline-capable PWA that computes exact per-square gem probabilities for Jewel Gate boards. It is a JavaScript port of the solver in `nadavcoh/jewel-gate-heatmap` (`scripts/solve.py`, `levels/levels.json`). Plain HTML/CSS/JS, no framework, no bundler, no npm dependencies.
-
-## Layout
-
-| Path | Role |
-|---|---|
-| `index.html`, `styles.css` | Page shell and styles (light and dark via `prefers-color-scheme`) |
-| `js/app.js` | UI, `localStorage` state (`jewelgate.v1`), grid painting, install/offline/update handling |
-| `js/solver.js` | Exact solver (bitmask enumeration); also loaded in `js/worker.js` |
-| `js/levels.js` | Level table: board size, gems with `size: [rows, cols]`, found colours |
-| `js/worker.js` | Web Worker wrapper around the solver |
-| `sw.js`, `manifest.webmanifest` | Offline cache and installability |
-| `tests/selftest.js`, `tests/blank.json` | Solver vs. stored results from the Python original |
+Offline-capable PWA that computes the exact chance that each unrevealed square of a Jewel Gate board hides part of a gem. It is a JavaScript port of the solver in `nadavcoh/jewel-gate-heatmap` (`scripts/solve.py`, `levels/levels.json`), without screenshots: the user picks the level, taps dug squares and marks found gems. Static site, no build step, no dependencies.
 
 ## Commands
 
 ```
-python3 -m http.server 8000     # run locally at http://localhost:8000
-node tests/selftest.js          # solver self-test; CI runs it before every deploy
+node tests/selftest.js          # must pass before every push (CI runs it too)
+python3 -m http.server 8000     # serve locally, then open http://localhost:8000
 ```
 
-## Deploy
+## Layout
 
-Push to `main` runs `.github/workflows/deploy.yml`: self-test, copy a fixed list of files into `_site/`, replace `__BUILD__` in `sw.js` with the commit SHA, deploy to GitHub Pages. Do not hand-edit `__BUILD__` in `sw.js`.
+| File | Role |
+|---|---|
+| `js/solver.js` | Exact solver. Classic script (no ES modules) so it works in `importScripts` and via `require` in tests. Keep it ES5-style. |
+| `js/worker.js` | Web Worker wrapper around the solver. |
+| `js/levels.js` | Level table: board size, gems (`class`, `count`, `size: [rows, cols]`, found `color`). |
+| `js/app.js` | UI, localStorage (`jewelgate.v1`), tap/drag painting, undo, install/offline/update handling. |
+| `sw.js` | Service worker: precaches the app shell, cache-first. |
+| `tests/selftest.js`, `tests/blank.json` | Solver regression test against results stored by the Python original. |
+| `.github/workflows/deploy.yml` | Runs the self-test, stamps the build into `sw.js`, deploys to GitHub Pages. |
 
-When adding a new top-level file or asset it must be added in **both** places or it will be missing offline or from the deployed site:
+## Rules to keep
 
-1. the `ASSETS` list in `sw.js` (precache)
-2. the `cp -r ...` line in `deploy.yml` (site assembly)
+- **Solver correctness first.** Any change to `js/solver.js` must keep `node tests/selftest.js` green (blank boards for levels 1-5 match to the second decimal, weighted layout counts, example boards, probability sums). The model: rotation and touching allowed, every layout consistent with the board equally likely, diamonds (1x1) handled combinatorially as `P = k/m + (1-k/m)*coverage`.
+- **Gem sizes are per level and are `[rows, cols]`.** There are no standard gem sizes. Whenever gems are listed (UI, docs, replies) write each gem's size out as rows x cols.
+- **Always show the heatmap and the found count** (e.g. "3 of 5 found"), including when every free square is tied.
+- **Adding a level:** add an entry to `js/levels.js` and, if the blank-board result is known, to `tests/blank.json` and the test. The solver supports up to 64 squares (two 32-bit masks).
+- **Solver runs off the main thread.** `js/app.js` terminates and respawns the worker when a newer request arrives; keep results cached by board key.
+- **Offline:** every file the app needs at runtime must be listed in `ASSETS` in `sw.js`. All paths are relative so the site works under `/<repo>/` on GitHub Pages. Do not add external requests (CDNs, fonts, analytics).
+- **Service worker versioning:** `sw.js` contains `__BUILD__`, replaced with the commit SHA by the deploy workflow. Do not hardcode a cache name and do not call `skipWaiting` on install (the update banner triggers it).
+- **Found-gem colours:** octagon, diamond and tall are measured from real screenshots; hex and flat are placeholders (see comment in `js/levels.js`). Hidden gems are magenta `#d600ff`.
+- Keep the README in sync with behaviour changes.
 
-## Conventions and gotchas
+## Pushing
 
-- Gem sizes are always `rows x cols`. There are no standard gem sizes; every gem in `js/levels.js` needs its own `size: [rows, cols]`.
-- Boards up to 64 squares are supported (bitmask solver).
-- All paths are relative so the site works under any GitHub Pages repo name. Keep it that way.
-- Never run the solver on the main thread unless the worker is unavailable (`requestSolve` already falls back).
-- Painting must stay cancel-safe: a dig is committed only on a completed `pointerup`. `pointercancel`, `visibilitychange` (hidden), `pagehide`, `blur`, a second finger, and touches in the screen-edge zone (`EDGE`) roll back or are ignored, so the iOS app switcher and other system gestures never dig a tile. Keep this behaviour when changing `js/app.js` grid input, and keep `#grid` on `touch-action:none`.
-- Found-gem colours for hex and flat are placeholders; octagon, diamond and tall are measured. Hidden gems are magenta.
-- Gem marks (`board().marks`, square index to gem class, set in Mark gem mode) are display-only bookkeeping: the solver ignores them because found gems are already inside the dug squares. They must stay a subset of `dug` (un-digging clears the mark; marking digs) and are part of every undo snapshot.
-- Stored state is untrusted: `board()` sanitises whatever comes out of `localStorage`. Preserve that when changing the state shape, and bump the `KEY` version if the shape changes incompatibly.
-
-## Working style
-
-- Commit to `main` directly; it deploys automatically. Use short imperative commit messages.
-- Update `README.md` when user-visible behaviour changes, and this file when layout, deploy or conventions change.
-- Deliver code changes as commits, never as tar.gz archives.
+- Push to `main`; the workflow deploys on every push.
+- Deliver code changes as commits to the repo, never as tar.gz archives.
+- Pushing with `git` using the short-lived token from the GitHub connector works for normal files, but GitHub rejects changes under `.github/workflows/` with that token (no `workflows` permission). Push workflow changes with the connector's `commit_files` instead.
+- Binary files (icons) should be pushed with real `git`, not pasted as base64.
