@@ -40,7 +40,7 @@ node tests/selftest.js          # solver vs. the Python original's stored result
 |---|---|
 | `js/solver.js` | exact solver (bitmask enumeration, runs in a Web Worker; level 5 blank board ~0.4 s on a laptop) |
 | `js/levels.js` | level table: board size, gems with sizes and found colours |
-| `js/app.js` | UI, localStorage, painting (with rollback on cancelled touches), install/offline handling |
+| `js/app.js` | UI, localStorage, painting in Dig and Mark gem modes (with rollback on cancelled touches), install/offline handling |
 | `sw.js`, `manifest.webmanifest` | offline cache and installability |
 
 To add a level, add an entry to `js/levels.js` (there are no standard gem sizes; every gem needs its own `size: [rows, cols]`). Boards up to 64 squares are supported.
